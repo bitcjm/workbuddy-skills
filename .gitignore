@@ -17,6 +17,9 @@ tmp/
 # WorkBuddy 运行时目录（memory/SOUL/IDENTITY 等敏感文件）
 .workbuddy/
 
+# 测试目录
+_test/
+
 # 脚本生成的缓存
 __pycache__/
 *.pyc

@@ -1,22 +1,38 @@
 # WorkBuddy Skills 安装脚本 (Windows PowerShell)
-# 用法:
-#   .\install.ps1                                # 全量安装
+#
+# 模式一：从已 clone 的本仓库目录安装
+#   .\install.ps1                                # 全量安装到用户级
 #   .\install.ps1 global                         # 只装 global 分类
 #   .\install.ps1 global coding                  # 装 global + coding
 #   .\install.ps1 -Skill coding/github           # 只装单个技能
 #   .\install.ps1 -Project global coding         # 装到项目级 .workbuddy/skills/
-#   .\install.ps1 -Project -Skill office/周报生成  # 单个技能装到项目级
+#
+# 模式二：从 GitHub 远程一键安装（自动 clone → 安装 → 清理）
+#   .\install.ps1 -Clone global coding           # 远程装 global+coding 到用户级
+#   .\install.ps1 -Clone -Project global         # 远程装到项目级
+#   .\install.ps1 -Clone                         # 远程全量安装
 
-param(
-    [switch]$Project,
-    [string]$Skill,
-    [Parameter(ValueFromRemainingArguments)]
-    [string[]]$Categories
-)
+$Clone = $false
+$Project = $false
+$Skill = ""
+$Categories = @()
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 手动解析参数（兼容 PowerShell 5.1）
+$i = 0
+while ($i -lt $args.Count) {
+    switch ($args[$i]) {
+        "-Clone"    { $Clone = $true; $i++ }
+        "-Project"  { $Project = $true; $i++ }
+        "-Skill"    { $i++; $Skill = $args[$i]; $i++ }
+        default     { $Categories += $args[$i]; $i++ }
+    }
+}
+
+$RepoUrl = "https://github.com/bitcjm/workbuddy-skills.git"
 $AllCategories = @("global", "office", "coding", "ai-creation")
 $Count = 0
+$CleanupClone = $false
+$CloneDir = ""
 
 if ($Project) {
     $TargetDir = ".workbuddy\skills"
@@ -25,46 +41,74 @@ if ($Project) {
 }
 
 Write-Host "=======================================" -ForegroundColor Cyan
-Write-Host "  WorkBuddy Skills 安装脚本 (Windows)" -ForegroundColor Cyan
+Write-Host "  WorkBuddy Skills Install (Windows)" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 单个技能安装模式
+# -- Clone --
+if ($Clone) {
+    $CloneDir = Join-Path $env:TEMP "workbuddy-skills-$(Get-Random)"
+    Write-Host "[Clone] Downloading from GitHub..." -ForegroundColor Cyan
+    git clone --depth 1 $RepoUrl $CloneDir 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Clone failed. Check network connection." -ForegroundColor Red
+        if (Test-Path $CloneDir) { Remove-Item -Recurse -Force $CloneDir }
+        exit 1
+    }
+    $ScriptDir = $CloneDir
+    $CleanupClone = $true
+    Write-Host "[OK] Cloned to: $CloneDir" -ForegroundColor Green
+    Write-Host ""
+} else {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+
+# -- Single Skill --
 if ($Skill) {
     $SkillFullPath = Join-Path $ScriptDir $Skill
     $SkillName = Split-Path $Skill -Leaf
     $Target = Join-Path $TargetDir $SkillName
 
     if (-not (Test-Path $SkillFullPath)) {
-        Write-Host "❌ 技能不存在: $SkillFullPath" -ForegroundColor Red
+        Write-Host "[ERROR] Skill not found: $Skill" -ForegroundColor Red
+        if ($CleanupClone -and (Test-Path $CloneDir)) { Remove-Item -Recurse -Force $CloneDir }
         exit 1
     }
 
     if (-not (Test-Path $TargetDir)) {
         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
     }
+    if (-not (Test-Path $Target)) {
+        New-Item -ItemType Directory -Path $Target -Force | Out-Null
+    }
 
-    if (Test-Path $Target) {
-        Write-Host "🔄 更新: $Skill → $Target" -ForegroundColor Gray
+    $hasContent = Get-ChildItem -Path $Target -ErrorAction SilentlyContinue
+    if ($hasContent) {
+        Write-Host "  [Update] $Skill" -ForegroundColor Gray
     } else {
-        Write-Host "📦 安装: $Skill → $Target" -ForegroundColor Green
+        Write-Host "  [Install] $Skill" -ForegroundColor Green
     }
 
     Copy-Item -Path "$SkillFullPath\*" -Destination $Target -Recurse -Force
     $Count++
 
+    if ($CleanupClone -and (Test-Path $CloneDir)) {
+        Write-Host ""
+        Write-Host "[Cleanup] Removing temp clone: $CloneDir" -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $CloneDir
+    }
+
     Write-Host ""
-    Write-Host "✅ 安装完成！共处理 $Count 个技能" -ForegroundColor Green
+    Write-Host "[Done] $Count skill(s) installed" -ForegroundColor Green
     exit 0
 }
 
-# 分类安装模式
+# -- Category Install --
 if (-not (Test-Path $TargetDir)) {
     New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-    Write-Host "📁 创建目标目录: $TargetDir" -ForegroundColor Yellow
+    Write-Host "[Dir] Created: $TargetDir" -ForegroundColor Yellow
 }
 
-# 如果未指定分类，则全量安装
 if ($Categories.Count -eq 0) {
     $Categories = $AllCategories
 }
@@ -72,18 +116,22 @@ if ($Categories.Count -eq 0) {
 foreach ($Cat in $Categories) {
     $CatPath = Join-Path $ScriptDir $Cat
     if (-not (Test-Path $CatPath)) {
-        Write-Host "⚠️  分类不存在: $Cat" -ForegroundColor Yellow
+        Write-Host "[WARN] Category not found: $Cat" -ForegroundColor Yellow
         continue
     }
 
-    Write-Host "📁 [$Cat]" -ForegroundColor Cyan
+    Write-Host "[$Cat]" -ForegroundColor Cyan
     $Skills = Get-ChildItem -Path $CatPath -Directory
     foreach ($SkillItem in $Skills) {
         $Target = Join-Path $TargetDir $SkillItem.Name
-        if (Test-Path $Target) {
-            Write-Host "  🔄 更新: $($SkillItem.Name)" -ForegroundColor Gray
+        if (-not (Test-Path $Target)) {
+            New-Item -ItemType Directory -Path $Target -Force | Out-Null
+        }
+        $hasContent = Get-ChildItem -Path $Target -ErrorAction SilentlyContinue
+        if ($hasContent) {
+            Write-Host "  [Update] $($SkillItem.Name)" -ForegroundColor Gray
         } else {
-            Write-Host "  📦 安装: $($SkillItem.Name)" -ForegroundColor Green
+            Write-Host "  [Install] $($SkillItem.Name)" -ForegroundColor Green
         }
         Copy-Item -Path "$($SkillItem.FullName)\*" -Destination $Target -Recurse -Force
         $Count++
@@ -91,9 +139,15 @@ foreach ($Cat in $Categories) {
     Write-Host ""
 }
 
-Write-Host "✅ 安装完成！共处理 $Count 个技能" -ForegroundColor Green
+if ($CleanupClone -and (Test-Path $CloneDir)) {
+    Write-Host "[Cleanup] Removing temp clone: $CloneDir" -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $CloneDir
+    Write-Host ""
+}
+
+Write-Host "[Done] $Count skill(s) installed" -ForegroundColor Green
 if ($Project) {
-    Write-Host "📍 安装位置: 项目级 (.workbuddy\skills\)" -ForegroundColor Cyan
+    Write-Host "[Location] Project-level (.workbuddy\skills\)" -ForegroundColor Cyan
 } else {
-    Write-Host "📍 安装位置: 用户级 (~\.workbuddy\skills\)" -ForegroundColor Cyan
+    Write-Host "[Location] User-level (~\.workbuddy\skills\)" -ForegroundColor Cyan
 }
