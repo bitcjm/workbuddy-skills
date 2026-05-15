@@ -22,30 +22,30 @@ disable: false
 ## 前提条件
 
 - `docx` npm 包已全局安装：`npm install -g docx`
-- 周报参考模板：`/d/AI/Work-Plan/1-国贸/3-周会周报/周报参考模板.docx`
+- 周报参考模板：`<项目目录>/周报参考模板.docx`
 
 ## 输入
 
 Markdown 格式的周报草稿文件，标准结构如下：
 
 ```markdown
-# 蔡家铭——2026年第19周周报
+# <姓名>——<年份>年第<周数>周周报
 
 ## 一、本周主要工作
 
-**1. 文档学习与现状梳理**
-系统阅读了部门职责、...
+**1. <工作模块一>**
+<工作内容摘要>...
 
-- 算力资源的分级管控...
-- 模型服务的非功能改造...
+- <具体事项1>...
+- <具体事项2>...
 
-**2. 现状分析与初步思考**
-结合文档...
+**2. <工作模块二>**
+<工作内容摘要>...
 
 ## 二、下周工作计划
 
-**1. DeepSeek V4 验证和部署**
-推进 V4 Flash 的 FP8 和 INT4 双模部署验证
+**1. <计划事项一>**
+<具体说明>
 ```
 
 ## 输出
@@ -99,7 +99,7 @@ Markdown 格式的周报草稿文件，标准结构如下：
 2. 读取文件内容（使用 Read 工具）
 3. 从文件名和内容中提取：
    - 姓名（从 Markdown 标题或上下文推断）
-   - 年份和周数（从 Markdown 标题中提取，如 `2026年第19周`）
+   - 年份和周数（从 Markdown 标题中提取，如 `<年份>年第<周数>周`）
 
 ### 第二步：编写生成脚本
 
@@ -135,7 +135,7 @@ spacing: { line: 360, lineRule: "auto" }
 ### 第三步：运行并验证
 
 ```bash
-NODE_PATH="C:/Users/CJM/AppData/Roaming/npm/node_modules" node /d/AI/Work-Plan/1-国贸/3-周会周报/2026.XX周/gen_weekly_report.js
+NODE_PATH="$(npm root -g)" node <输出目录>/gen_weekly_report.js
 ```
 
 ## 注意
@@ -146,6 +146,5 @@ NODE_PATH="C:/Users/CJM/AppData/Roaming/npm/node_modules" node /d/AI/Work-Plan/1
 - 模板中无页眉，不要加页眉
 - 页脚格式为 `第 PAGE 页`，灰色 #999999，9pt
 - 标题不要使用 Heading 样式，用 Paragraph 直接控制字号加粗
-- 参考模板路径：`/d/AI/Work-Plan/1-国贸/3-周会周报/周报参考模板.docx`
-- 实际生成脚本参考：`/d/AI/Work-Plan/1-国贸/3-周会周报/2026.19周/gen_weekly_report.js`
-- `1-国贸/周报/` 目录已废弃，实际路径在 `1-国贸/3-周会周报/`
+- 参考模板路径：`<项目目录>/周报参考模板.docx`
+- 实际生成脚本参考：`<输出目录>/gen_weekly_report.js`
